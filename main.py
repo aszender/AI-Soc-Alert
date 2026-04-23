@@ -1,6 +1,10 @@
-def main():
-    print("Hello from d3-ai-soc!")
+"""AI SOC Alert Investigator — FastAPI application."""
+from fastapi import FastAPI
+from .api.routes import router
 
-
-if __name__ == "__main__":
-    main()
+app = FastAPI(
+    title="AI SOC Alert Investigator",
+    description="Multi-agent AI system for autonomous security alert investigation",
+    version="1.0.0",
+)
+app.include_router(router)
