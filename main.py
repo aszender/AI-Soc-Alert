@@ -1,6 +1,6 @@
 """AI SOC Alert Investigator — FastAPI application."""
 from fastapi import FastAPI
-from .api.routes import router
+from backend.app.api.routes import router
 
 app = FastAPI(
     title="AI SOC Alert Investigator",

@@ -34,13 +34,14 @@ class LLMClient:
             else:
                 result = self._api_call(system_prompt, user_message, temperature, max_tokens)
 
+        tokens_used = int(result.get("_tokens", 0) or 0)
         structured_log(
             "INFO", "llm_call",
             agent_id="llm_client",
-            tokens_used=result.get("_tokens", 0),
+            tokens_used=tokens_used,
             latency_ms=t.ms,
         )
-        self.token_count += result.pop("_tokens", 0)
+        self.token_count += tokens_used
         return result
 
     def _api_call(self, system_prompt, user_message, temperature, max_tokens, retries=3):

@@ -88,10 +88,12 @@ class SupervisorAgent:
                     if report.confidence < 0.7:
                         report.requires_human_review = True
 
-                    trace.append({"step": "triage", "agent": "triage_agent",
-                                  "severity": report.severity.value,
-                                  "confidence": report.confidence,
-                                  "latency_ms": triage_timer.ms})
+                    triage_trace = {"step": "triage", "agent": "triage_agent",
+                                    "severity": report.severity.value,
+                                    "confidence": report.confidence,
+                                    "latency_ms": triage_timer.ms}
+                    self._attach_llm_diagnostics(triage_trace, triage_result)
+                    trace.append(triage_trace)
                     audit.log_action("triage", "classify",
                                      {"severity": report.severity.value,
                                       "confidence": report.confidence})
@@ -119,9 +121,11 @@ class SupervisorAgent:
                         confidence=r.get("confidence", 0.0),
                         details=r.get("details", ""),
                     ))
-                trace.append({"step": "enrichment", "agent": "enrichment_agent",
-                              "indicators": len(report.enrichment_results),
-                              "latency_ms": enrich_timer.ms})
+                enrich_trace = {"step": "enrichment", "agent": "enrichment_agent",
+                                "indicators": len(report.enrichment_results),
+                                "latency_ms": enrich_timer.ms}
+                self._attach_llm_diagnostics(enrich_trace, enrich_data)
+                trace.append(enrich_trace)
                 audit.log_action("enrichment", "enrich",
                                  {"indicators": len(report.enrichment_results)})
 
@@ -155,9 +159,11 @@ class SupervisorAgent:
                     if action.requires_approval:
                         hitl.request_approval(action, report.id)
 
-                trace.append({"step": "response", "agent": "response_agent",
-                              "actions": len(report.recommended_actions),
-                              "latency_ms": resp_timer.ms})
+                response_trace = {"step": "response", "agent": "response_agent",
+                                  "actions": len(report.recommended_actions),
+                                  "latency_ms": resp_timer.ms}
+                self._attach_llm_diagnostics(response_trace, playbook)
+                trace.append(response_trace)
                 audit.log_action("response", "generate_playbook",
                                  {"actions": len(report.recommended_actions)})
 
@@ -183,3 +189,13 @@ class SupervisorAgent:
                               "confidence": report.confidence,
                               "actions": len(report.recommended_actions)})
         return report
+
+    @staticmethod
+    def _attach_llm_diagnostics(trace_entry: dict, llm_result: dict) -> None:
+        trace_entry["tokens_used"] = int(llm_result.get("_tokens", 0) or 0)
+        if llm_result.get("fallback"):
+            trace_entry["fallback"] = True
+        if error := llm_result.get("error"):
+            trace_entry["error"] = error
+        if "raw_response" in llm_result:
+            trace_entry["raw_response"] = True
