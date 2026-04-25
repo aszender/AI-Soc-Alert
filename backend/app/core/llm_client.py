@@ -1,10 +1,4 @@
-"""
-LLM API client with retry, token tracking, and demo mode.
-
-Wraps the LLM so the rest of the app doesn't care which provider
-is behind it. Swap OpenAI for Azure OpenAI or Anthropic without
-changing any agent code.
-"""
+"""LLM API client with retries, token tracking, and local fixture responses."""
 import json
 import time
 from typing import Optional

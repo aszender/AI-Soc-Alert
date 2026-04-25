@@ -60,16 +60,15 @@ class GetInvestigationArgs(BaseModel):
 class ThreatIntelProvider:
     """Threat intel provider interface.
 
-    Real deployments should inject a provider backed by VirusTotal, AbuseIPDB,
-    MISP, or an internal TIP. The default provider is deterministic demo data
-    and returns unknown for unrecognized indicators.
+    Deployments can inject a provider backed by VirusTotal, AbuseIPDB, MISP,
+    a commercial TIP, or an internal intelligence service.
     """
 
     def lookup(self, indicator: str, indicator_type: str) -> dict[str, Any]:
         raise NotImplementedError
 
 
-class DemoThreatIntelProvider(ThreatIntelProvider):
+class FixtureThreatIntelProvider(ThreatIntelProvider):
     _known: dict[tuple[str, str], dict[str, Any]] = {
         ("45.33.32.156", "ip"): {
             "sources": [
@@ -96,7 +95,7 @@ class DemoThreatIntelProvider(ThreatIntelProvider):
             result = {
                 "sources": [],
                 "overall": "unknown",
-                "note": "No demo threat intel match. Configure a real provider for production enrichment.",
+                "note": "No fixture threat intel match. Configure an external provider for enrichment.",
             }
         return {"indicator": indicator, "type": indicator_type, **result}
 
@@ -110,7 +109,7 @@ class MCPToolRouter:
         self.name = "soc-investigator"
         self.version = "1.0.0"
         self.investigation_service = investigation_service
-        self.threat_intel = threat_intel or DemoThreatIntelProvider()
+        self.threat_intel = threat_intel or FixtureThreatIntelProvider()
         self._tools: dict[str, tuple[type[BaseModel], Any, str]] = {
             "investigate_alert": (
                 InvestigateAlertArgs,

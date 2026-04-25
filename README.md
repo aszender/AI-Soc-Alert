@@ -86,7 +86,7 @@ GET  /health
 The MCP server exposes the investigation system as tools for AI hosts.
 
 ```bash
-uv run soc-mcp-server
+uv run python -m backend.app.integrations.mcp_server
 ```
 
 Available MCP tools:
@@ -108,14 +108,16 @@ Example VS Code workspace configuration:
         "--directory",
         "/absolute/path/to/ai-soc-investigator",
         "run",
-        "soc-mcp-server"
+        "python",
+        "-m",
+        "backend.app.integrations.mcp_server"
       ]
     }
   }
 }
 ```
 
-Save this as `.vscode/mcp.json`, then use `MCP: List Servers` from the VS Code command palette and start `soc-investigator`.
+This repository includes `.vscode/mcp.json` with the same workspace server definition. Use `MCP: List Servers` from the VS Code command palette and start `soc-investigator`.
 
 ## Investigation Flow
 
