@@ -8,3 +8,10 @@ __pycache__/
 learn/
 
 .DS_Store
+
+# VS Code: ignore local workspace files, but keep shareable project config
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
