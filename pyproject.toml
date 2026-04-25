@@ -1,15 +1,19 @@
 [project]
-name = "d3-ai-soc"
-version = "0.1.0"
-description = "Add your description here"
+name = "ai-soc-investigator"
+version = "1.0.0"
+description = "Multi-agent AI incident investigation platform with governed LLM workflows"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.136.0",
     "httpx>=0.28.1",
+    "mcp>=1.0.0",
     "openai>=2.32.0",
     "pydantic>=2.13.2",
     "pytest>=9.0.3",
     "python-dotenv>=1.2.2",
     "uvicorn>=0.44.0",
 ]
+
+[project.scripts]
+soc-mcp-server = "backend.app.integrations.mcp_server:main"

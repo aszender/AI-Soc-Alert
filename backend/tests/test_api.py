@@ -1,17 +1,18 @@
 """Tests for FastAPI endpoints."""
 from fastapi.testclient import TestClient
 from main import app
-from backend.app.api import routes as api_routes
 from backend.app.core.config import settings
 from backend.app.governance import hitl
+from backend.app.investigations.service import service
+from backend.app.investigations.store import store
 
 client = TestClient(app)
 
 
 def setup_function():
-    api_routes._investigations.clear()
-    api_routes._llm.call_count = 0
-    api_routes._llm.token_count = 0
+    store.clear()
+    service.llm.call_count = 0
+    service.llm.token_count = 0
     hitl._pending.clear()
     hitl._history.clear()
 

@@ -1,35 +1,15 @@
-"""
-Deterministic Rules Engine — Handles known patterns WITHOUT calling the LLM.
-
-This is critical for production AI systems:
-- Known malware (mimikatz, cobalt strike) → always critical, no LLM needed
-- Scheduled scans → always false positive, no LLM needed
-- Certificate expiry → always low/maintenance, no LLM needed
-
-WHY: Deterministic rules are faster (0ms vs 2000ms), cheaper ($0 vs $0.03),
-and 100% reliable (same input = same output every time).
-
-The LLM handles NOVEL or AMBIGUOUS alerts that don't match any rule.
-
-D3 Morpheus tracks the deterministic-to-LLM ratio over time.
-As patterns become well-understood, they graduate from LLM to rules.
-"""
+"""Deterministic classification rules for high-confidence alert patterns."""
 from ..models import Alert, Severity, DecisionSource
 
 
 class RulesEngine:
-    """
-    Pattern-matching rules for known alert types.
-    Returns a classification if matched, None if the alert needs LLM analysis.
-    """
+    """Classify known alert types before escalating ambiguous cases to the LLM."""
 
-    # Known malicious tools — always critical, no ambiguity
     KNOWN_CRITICAL_PROCESSES = [
         "mimikatz", "cobalt strike", "meterpreter", "bloodhound",
         "lazagne", "rubeus", "sharphound", "empire",
     ]
 
-    # Known false positive sources
     KNOWN_FP_PATTERNS = [
         {"field": "source_tool", "contains": "Nessus", "alert_type_contains": "scan"},
         {"field": "source_tool", "contains": "Qualys", "alert_type_contains": "scan"},
@@ -38,13 +18,6 @@ class RulesEngine:
     ]
 
     def evaluate(self, alert: Alert) -> dict | None:
-        """
-        Try to classify the alert using deterministic rules.
-
-        Returns:
-            dict with classification if a rule matches, or None if LLM is needed.
-        """
-        # Rule 1: Known critical tools
         proc = (alert.process_name or "").lower()
         desc = alert.description.lower()
         for tool in self.KNOWN_CRITICAL_PROCESSES:
@@ -55,12 +28,10 @@ class RulesEngine:
                     "mitre_technique": "T1003.001" if "mimikatz" in tool else "T1059",
                     "mitre_name": f"Known malicious tool: {tool}",
                     "attack_stage": "credential_access",
-                    "reasoning": f"Deterministic rule: '{tool}' is a known attack tool. "
-                                 f"No LLM analysis needed.",
+                    "reasoning": f"Deterministic rule matched known attack tool: {tool}.",
                     "decision_source": DecisionSource.DETERMINISTIC.value,
                 }
 
-        # Rule 2: Known false positives (scheduled scans)
         for pattern in self.KNOWN_FP_PATTERNS:
             if self._match_pattern(alert, pattern):
                 return {
@@ -69,11 +40,10 @@ class RulesEngine:
                     "mitre_technique": "N/A",
                     "mitre_name": "Known benign activity",
                     "attack_stage": "none",
-                    "reasoning": f"Deterministic rule: Matches known false positive pattern.",
+                    "reasoning": "Deterministic rule matched a known benign scanner pattern.",
                     "decision_source": DecisionSource.DETERMINISTIC.value,
                 }
 
-        # Rule 3: Certificate expiry — operational, not security
         if "certificate" in desc and ("expir" in desc or "renew" in desc):
             return {
                 "severity": Severity.LOW.value,
@@ -85,7 +55,6 @@ class RulesEngine:
                 "decision_source": DecisionSource.DETERMINISTIC.value,
             }
 
-        # No rule matched → needs LLM
         return None
 
     def _match_pattern(self, alert: Alert, pattern: dict) -> bool:

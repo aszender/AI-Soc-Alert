@@ -112,7 +112,7 @@ def _print_results(results: list[dict]):
     print(f"\n  {'ID':<12} {'Expected':<16} {'Actual':<16} {'Source':<15} {'Match'}")
     print(f"  {'─'*12} {'─'*16} {'─'*16} {'─'*15} {'─'*5}")
     for r in results:
-        match = "✓" if r["severity_match"] else "✗"
+        match = "PASS" if r["severity_match"] else "FAIL"
         print(f"  {r['id']:<12} {r['expected_severity']:<16} {r['actual_severity']:<16} "
               f"{r['actual_source']:<15} {match}")
 

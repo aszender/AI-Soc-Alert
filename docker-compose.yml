@@ -7,6 +7,7 @@ services:
       - .env
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-demo-key}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

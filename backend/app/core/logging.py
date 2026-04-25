@@ -1,15 +1,4 @@
-"""
-Structured logging with trace_id, latency, and observability fields.
-
-Every log entry includes:
-- trace_id: links all steps of one investigation together
-- agent_id: which agent produced the log
-- latency_ms: how long the operation took
-- decision_source: "deterministic" or "llm"
-- tokens_used: LLM token consumption
-
-This is what production AI systems need for debugging and monitoring.
-"""
+"""Structured JSON logging for investigation traces and LLM observability."""
 import json
 import time
 import uuid
@@ -64,5 +53,4 @@ def structured_log(
         entry["latency_ms"] = latency_ms
     if extra:
         entry.update(extra)
-    # In production: ship to ELK / Datadog / Splunk
     print(json.dumps(entry))

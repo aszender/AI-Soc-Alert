@@ -10,17 +10,11 @@ GET  /health               — Integration and system health
 """
 from fastapi import APIRouter, HTTPException
 from ..models import InvestigateRequest, Alert, HealthResponse
-from ..core.llm_client import LLMClient
 from ..core.config import settings
-from ..agents.supervisor import SupervisorAgent
 from ..governance import hitl
+from ..investigations.service import service
 
 router = APIRouter()
-
-# In-memory store (in production: database)
-_investigations: dict = {}
-_llm = LLMClient()
-_supervisor = SupervisorAgent(_llm)
 
 
 @router.post("/alerts/investigate")
@@ -36,14 +30,13 @@ def investigate_alert(req: InvestigateRequest):
         process_name=req.process_name,
         raw_event=req.raw_event,
     )
-    report = _supervisor.investigate(alert)
-    _investigations[report.id] = report
+    report = service.investigate(alert)
     return report.model_dump()
 
 
 @router.get("/investigations/{investigation_id}")
 def get_investigation(investigation_id: str):
-    report = _investigations.get(investigation_id)
+    report = service.get(investigation_id)
     if not report:
         raise HTTPException(404, "Investigation not found")
     return report.model_dump()
@@ -75,5 +68,5 @@ def health_check():
     return HealthResponse(
         status="healthy",
         mode="demo" if settings.is_demo_mode else "production",
-        integrations={"llm": _llm.get_stats()},
+        integrations={"llm": service.llm.get_stats()},
     )

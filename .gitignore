@@ -1,4 +1,10 @@
-!README.md
-*.md
 .env
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
 
+learn/
+
+.DS_Store
