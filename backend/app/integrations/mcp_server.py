@@ -1,4 +1,4 @@
-"""MCP tools for the AI SOC investigation service.
+"""MCP tools for the AI SOC Alert service.
 
 The module exposes two layers:
 - ``MCPToolRouter``: testable, SDK-independent tool listing/call handling.

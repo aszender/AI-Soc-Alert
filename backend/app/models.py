@@ -1,5 +1,5 @@
 """
-Domain models for the AI SOC investigation platform.
+Domain models for the AI SOC Alert platform.
 
 All models use Pydantic for runtime validation — if a field is wrong,
 we get a clear error instead of a silent bug in production.

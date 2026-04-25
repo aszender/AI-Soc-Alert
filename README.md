@@ -1,6 +1,6 @@
-# AI SOC Investigator
+# AI SOC Alert
 
-AI SOC Investigator is a multi-agent incident investigation platform for security alerts. It combines deterministic detection logic, governed LLM reasoning, enrichment, response playbook generation, human approval gates, and MCP tool exposure behind a FastAPI service.
+AI SOC Alert is a multi-agent incident investigation platform for security alerts. It combines deterministic detection logic, governed LLM reasoning, enrichment, response playbook generation, human approval gates, and MCP tool exposure behind a FastAPI service.
 
 The project is structured as an AI engineering system rather than a prompt-only prototype. The core design separates orchestration, model access, guardrails, governance, persistence, API delivery, MCP delivery, and evaluation so each layer can be tested and replaced independently.
 

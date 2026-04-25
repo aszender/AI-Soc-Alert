@@ -1,5 +1,5 @@
 """
-Evaluation suite — Measures AI SOC investigation quality.
+Evaluation suite — Measures AI SOC Alert quality.
 
 Metrics:
 - severity_accuracy: Did we classify correctly?
