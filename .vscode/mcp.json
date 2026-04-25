@@ -1,0 +1,17 @@
+{
+	"servers": {
+		"soc-investigator": {
+			"type": "stdio",
+			"command": "/usr/local/bin/uv",
+			"args": [
+				"--directory",
+				"/Users/aszender/VSCProyects/D3-AI-Soc",
+				"run",
+				"python",
+				"-m",
+				"backend.app.integrations.mcp_server"
+			]
+		}
+	},
+	"inputs": []
+}
