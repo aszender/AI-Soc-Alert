@@ -1,194 +1,166 @@
 # AI SOC Alert
 
-AI SOC Alert is a multi-agent incident investigation platform for security alerts. It combines deterministic detection logic, governed LLM reasoning, enrichment, response playbook generation, human approval gates, and MCP tool exposure behind a FastAPI service.
+## Overview
 
-The project is structured as an AI engineering system rather than a prompt-only prototype. The core design separates orchestration, model access, guardrails, governance, persistence, API delivery, MCP delivery, and evaluation so each layer can be tested and replaced independently.
+Security alert investigation requires classifying severity, interpreting indicators, and deciding what an analyst should review next. AI SOC Alert is a multi-agent incident investigation platform that turns an alert into a structured report with reasoning, recommendations, and an investigation trace.
+
+A supervisor coordinates deterministic rules, LLM triage, enrichment, and response planning. Input and output guardrails, call and token budgets, audit records, and a human approval workflow provide governance around that process.
+
+The engineering system separates orchestration, model access, validation, storage, and delivery through FastAPI and the Model Context Protocol (MCP). Local fixtures, automated tests, and a golden-alert evaluation harness support repeatable development. Response actions are recommendations; the system does not execute remediation.
 
 ## Architecture
 
-```text
-Security alert
-    |
-    v
-FastAPI / MCP tool interface
-    |
-    v
-Investigation service
-    |
-    v
-Supervisor agent
-    |
-    +--> Input guardrails
-    +--> Deterministic rules engine
-    +--> LLM triage agent
-    +--> Enrichment agent
-    +--> Response agent
-    +--> Output guardrails
-    +--> HITL approval workflow
-    |
-    v
-Investigation report, trace, recommendations, metrics
+```mermaid
+flowchart TD
+    alert["Security Alert"] --> interface["FastAPI / MCP Interface"]
+    interface --> service["Investigation Service"]
+    service --> supervisor["Supervisor Agent"]
+    supervisor --> input["Input Guardrails"]
+    input --> rules["Deterministic Rules Engine"]
+    rules -->|No match| triage["LLM Triage Agent"]
+    rules -->|Rule matched| enrichment["Enrichment Agent"]
+    triage --> enrichment
+    enrichment --> response["Response Agent"]
+    response --> output["Output Guardrails"]
+    response -.->|Flagged actions| approval["Human-in-the-Loop Approval"]
+    output --> report["Investigation Report / Trace / Recommendations / Metrics"]
 ```
+
+The diagram shows the main investigation path. Enrichment runs for medium-or-higher severity; response planning runs for high or critical severity, subject to budgets. Blocked input and high-confidence false positives return early. Approval requests are created during response planning, before output checks; reports return without waiting for an approval decision.
+
+## Design Principles
+
+- **Rules before escalation:** Classify known patterns deterministically; use LLM triage when no rule matches.
+- **Structured, checked outputs:** Request JSON, build Pydantic report models, and apply targeted output checks.
+- **Bounded autonomy:** Check call and token budgets before each agent stage; return recommendations for review.
+- **Human approval for high-risk actions:** Queue high-risk or critical recommendations when flagged as requiring approval.
+- **Observability and evaluation:** Record traces, decisions, usage, and latency; evaluate against golden alerts.
 
 ## Core Capabilities
 
-- Multi-agent alert investigation coordinated by a supervisor agent.
-- Deterministic rules for high-confidence security patterns before LLM escalation.
-- LLM triage with MITRE ATT&CK mapping, confidence scoring, and structured JSON outputs.
-- Threat enrichment abstraction for IPs, domains, and hashes.
-- Response playbook generation with action risk classification.
-- Human-in-the-loop approval gates for high-risk or destructive actions.
-- Input guardrails for prompt injection and oversized payloads.
-- Output guardrails for hallucinated indicators, severity downgrades, invalid confidence, and incomplete actions.
-- Token and call budget enforcement per investigation.
-- Structured JSON logging with trace IDs, latency, token usage, and decision source.
-- FastAPI endpoints for application integration.
-- MCP server exposing investigation tools to AI clients such as VS Code, Claude Desktop, and MCP Inspector.
-- Evaluation harness with golden alerts for regression testing investigation quality.
+- Supervisor-led triage with severity, confidence, reasoning, and MITRE ATT&CK mapping.
+- Rules for known attack tools, benign scanner activity, and certificate lifecycle events.
+- LLM-based enrichment of IPs and file hashes; a separate MCP lookup tool uses an injectable fixture provider for IPs, domains, and hashes.
+- Response playbooks with risk levels and approval requests, plus HTTP endpoints to approve or reject requests.
+- Input checks for injection patterns and description length; output checks for unexpected narrative IPs, suspicious severity downgrades, invalid confidence, and missing action targets.
+- JSON logs, investigation traces, token/call accounting, and golden-alert evaluation.
+
+## Quick Start
+
+Requires Python 3.10+ and `uv`. From the repository root:
+
+```bash
+uv sync --locked
+cp -n .env.example .env
+OPENAI_API_KEY=demo-key uv run uvicorn main:app --reload
+```
+
+Open [the API docs](http://localhost:8000/docs) and submit `POST /alerts/investigate` with:
+
+```json
+{
+  "source_tool": "manual",
+  "description": "Mimikatz execution on WORKSTATION-042",
+  "hostname": "WORKSTATION-042",
+  "process_name": "mimikatz.exe"
+}
+```
+
+Demo mode uses local fixtures without an API key. The copy command preserves an existing `.env`; the startup command explicitly selects demo mode.
 
 ## Repository Layout
 
 ```text
-backend/app/api/              FastAPI routes
-backend/app/agents/           Triage, enrichment, response, and supervisor agents
-backend/app/core/             Configuration, LLM client, logging, deterministic rules
-backend/app/evals/            Golden-alert evaluation harness
-backend/app/governance/       Budgets, permissions, audit log, human approvals
-backend/app/guardrails/       Input and output safety controls
-backend/app/integrations/     MCP server and connector abstractions
-backend/app/investigations/   Shared investigation service and store
-backend/tests/                API, governance, guardrail, observability, and MCP tests
+main.py                      FastAPI application entry point
+backend/app/api/             HTTP routes
+backend/app/agents/          Supervisor, triage, enrichment, and response agents
+backend/app/core/            Configuration, LLM client, logging, and rules
+backend/app/evals/           Golden alerts and evaluation harness
+backend/app/governance/      Budgets, permission policies, audit, and approvals
+backend/app/guardrails/      Input and output checks
+backend/app/integrations/    MCP server and connector abstractions
+backend/app/investigations/  Investigation service and in-memory store
+backend/tests/               API, governance, guardrail, observability, and MCP tests
 ```
 
 ## Runtime Interfaces
 
 ### FastAPI
 
-The HTTP API is intended for service-to-service or dashboard integration.
+Start the HTTP service with `uv run uvicorn main:app --reload` (or the demo command above).
 
-```bash
-uv run uvicorn main:app --reload
-```
-
-Primary endpoints:
-
-```text
-POST /alerts/investigate
-GET  /investigations/{investigation_id}
-GET  /approvals/pending
-POST /approvals/{request_id}/approve
-POST /approvals/{request_id}/reject
-GET  /health
-```
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /alerts/investigate` | Investigate an alert |
+| `GET /investigations/{investigation_id}` | Retrieve a report |
+| `GET /approvals/pending` | List pending approvals |
+| `POST /approvals/{request_id}/approve` | Record approval |
+| `POST /approvals/{request_id}/reject` | Record rejection |
+| `GET /health` | Return mode and LLM usage counters |
 
 ### MCP Server
 
-The MCP server exposes the investigation system as tools for AI hosts.
+Start the stdio server for an MCP host:
 
 ```bash
 uv run python -m backend.app.integrations.mcp_server
 ```
 
-Available MCP tools:
+Tools: `investigate_alert`, `lookup_threat_intel`, and `get_investigation`.
 
-```text
-investigate_alert
-lookup_threat_intel
-get_investigation
-```
-
-Example VS Code workspace configuration:
-
-```json
-{
-  "servers": {
-    "soc-investigator": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/ai-soc-investigator",
-        "run",
-        "python",
-        "-m",
-        "backend.app.integrations.mcp_server"
-      ]
-    }
-  }
-}
-```
-
-This repository includes `.vscode/mcp.json` with the same workspace server definition. Use `MCP: List Servers` from the VS Code command palette and start `soc-investigator`.
+The included [VS Code configuration](.vscode/mcp.json) defines `soc-investigator`. Update its absolute `command` and `--directory` paths for your machine before starting it.
 
 ## Investigation Flow
 
-1. The API or MCP layer receives an alert and validates the request.
-2. The investigation service builds a domain `Alert` and delegates to the supervisor.
-3. Input guardrails block prompt injection and malformed oversized alert text before model access.
-4. The rules engine handles known patterns such as credential dumping tools, scheduled scanner activity, and certificate lifecycle events.
-5. Ambiguous alerts are escalated to the triage agent for severity classification, MITRE mapping, confidence scoring, and rationale generation.
-6. The enrichment agent checks relevant indicators and normalizes results into the report.
-7. The response agent generates a playbook with action risk levels and approval requirements.
-8. Governance controls apply token budgets, least-privilege policy, and human approval gates.
-9. Output guardrails validate the report before returning it to the caller.
-10. The final report includes severity, confidence, evidence, enrichment, recommended actions, trace entries, token usage, and latency.
+1. FastAPI or MCP validates the request and builds an `Alert`; the shared service invokes the supervisor.
+2. Input guardrails check the description before model access. Blocked alerts return for human review.
+3. Rules classify known patterns; unmatched alerts use LLM triage if budget permits. High-confidence false positives close early.
+4. Eligible alerts proceed through enrichment and response planning. Actions marked `requires_approval` enter the approval workflow; high-risk and critical requests remain pending.
+5. Output guardrails check the report and flag failures for review. The service stores and returns the report, trace, recommendations, and usage metrics.
 
 ## Configuration
 
-Configuration is environment-driven.
+Settings load from environment variables and `.env`.
 
-```bash
-cp .env.example .env
-```
+| Setting | Default / behavior |
+| --- | --- |
+| `OPENAI_API_KEY` | `demo-key` selects fixtures; a real key enables live LLM calls |
+| `LLM_MODEL` | `gpt-4` |
+| `MAX_TOKENS_PER_INVESTIGATION` | `5000`; checked before each agent call |
+| `MAX_LLM_CALLS_PER_INVESTIGATION` | `15`; checked before each agent call |
 
-Important settings:
-
-```text
-OPENAI_API_KEY
-LLM_MODEL
-LLM_TEMPERATURE
-MAX_TOKENS_PER_INVESTIGATION
-MAX_LLM_CALLS_PER_INVESTIGATION
-MAX_TOOL_CALLS_PER_INVESTIGATION
-LOG_LEVEL
-DB_PATH
-```
-
-When `OPENAI_API_KEY=demo-key`, the system uses deterministic local fixtures for repeatable development and CI behavior. Set a real key to exercise live LLM calls.
+`LLM_TEMPERATURE`, `MAX_TOOL_CALLS_PER_INVESTIGATION`, `LOG_LEVEL`, and `DB_PATH` are declared but currently do not control runtime behavior. Token accounting happens after a call, so the final call can exceed the token threshold.
 
 ## Testing
 
-Run the full test suite:
+Run tests and evaluation with repeatable local fixtures:
 
 ```bash
-uv run pytest
+OPENAI_API_KEY=demo-key uv run pytest
+OPENAI_API_KEY=demo-key uv run python -m backend.app.evals.evaluate
 ```
 
-Run the evaluation harness:
+For MCP routing tests only:
 
 ```bash
-uv run python -m backend.app.evals.evaluate
+OPENAI_API_KEY=demo-key uv run pytest backend/tests/test_mcp_server.py
 ```
 
-Run MCP-focused tests:
-
-```bash
-uv run pytest backend/tests/test_mcp_server.py
-```
+The evaluation prints severity and decision-source accuracy, report field checks, review rates, guardrail blocks, token usage, and latency. Demo token counts are fixture values.
 
 ## Docker
 
-Build and run the API service:
+The repository includes a Dockerfile and Compose configuration targeting API port `8000`:
 
 ```bash
 docker compose up --build
 ```
 
-The API is exposed on port `8000`.
+The container setup needs fixes before use: the Dockerfile does not copy `main.py`, runs package installation before copying application files and the README, and does not install `curl` for the Compose health check. Use the local Quick Start for the walkthrough.
 
 ## Engineering Notes
 
-The current store is process-local and intentionally isolated behind `backend/app/investigations/store.py`. Replacing it with SQLite, Postgres, or a queue-backed workflow store does not require changing the API or MCP tool layer.
-
-The threat-intel implementation uses an injectable provider interface. Production deployment should wire this to VirusTotal, AbuseIPDB, MISP, a commercial TIP, or an internal intelligence service.
-
-The system is designed around bounded autonomy: model calls are budgeted, tool outputs are validated, high-risk actions require approval, and deterministic rules are preferred when confidence is high.
+- **Storage:** Reports, approvals, and audit records are process-local. Separately launched API and MCP processes do not share state; restarts clear it.
+- **Enrichment:** Investigation enrichment is generated by the LLM or demo fixtures. MCP threat lookup defaults to fixtures. Vendor names in prompts and fixtures do not represent live integrations.
+- **Governance:** Permission policies exist and are tested separately, but the supervisor does not invoke them. Approval records do not execute actions or update action approval fields in stored reports.
+- **Validation:** Guardrails are targeted checks, not comprehensive validation of model output. Early returns skip later stages and may leave latency at its default value.
