@@ -55,7 +55,7 @@ cp -n .env.example .env
 OPENAI_API_KEY=demo-key uv run uvicorn main:app --reload
 ```
 
-Open [the API docs](http://localhost:8000/docs) and submit `POST /alerts/investigate` with:
+Open [API docs](http://localhost:8000/docs) and submit `POST /alerts/investigate` with:
 
 ```json
 {
@@ -150,13 +150,25 @@ The evaluation prints severity and decision-source accuracy, report field checks
 
 ## Docker
 
-The repository includes a Dockerfile and Compose configuration targeting API port `8000`:
+With Docker and Docker Compose installed and running, run from the repository root:
 
 ```bash
+cp -n .env.example .env
 docker compose up --build
 ```
 
-The container setup needs fixes before use: the Dockerfile does not copy `main.py`, runs package installation before copying application files and the README, and does not install `curl` for the Compose health check. Use the local Quick Start for the walkthrough.
+Compose loads `.env`; the example selects `OPENAI_API_KEY=demo-key`. To force demo mode even with an existing key, use `OPENAI_API_KEY=demo-key docker compose up --build`.
+
+The image installs dependencies from `uv.lock` and starts Uvicorn on `0.0.0.0:8000`, mapped to host port `8000`. Open [API docs](http://localhost:8000/docs). The health check uses Python's standard library to check `GET /health`, without requiring `curl` in the image.
+
+In another terminal, check container status and the health response:
+
+```bash
+docker compose ps
+docker compose exec api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health', timeout=3).read().decode())"
+```
+
+Expect `status: healthy` and, when using `demo-key`, `mode: demo` in the JSON response. Stop and remove the container with `docker compose down`.
 
 ## Engineering Notes
 

@@ -9,7 +9,11 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-demo-key}
       - LLM_MODEL=${LLM_MODEL:-gpt-4}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json, urllib.request; response = urllib.request.urlopen('http://localhost:8000/health', timeout=3); assert response.status == 200 and json.load(response)['status'] == 'healthy'"
       interval: 30s
       timeout: 5s
       retries: 3
